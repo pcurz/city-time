@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Time Position Generator - Adult Swim Style</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Adult Swim inspired background pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 30px;
+            height: 100vh;
+            padding: 20px;
+        }
+
+        .workspace {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #ffffff;
+            border-radius: 15px;
+            padding: 25px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+        }
+
+        .workspace::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #ffffff, transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        #background-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            z-index: 1;
+        }
+
+        .text-element {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            z-index: 10;
+            background: transparent;
+            white-space: nowrap;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .text-element:hover {
+            border-color: #ffffff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+            transform: scale(1.02);
+        }
+
+        .text-element.selected {
+            border-color: #ffffff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .controls {
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #ffffff;
+            border-radius: 15px;
+            padding: 25px;
+            overflow-y: auto;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+        }
+
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(20, 20, 20, 0.8);
+            border-radius: 12px;
+            border: 1px solid #333;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, #ffffff, #cccccc, #ffffff);
+        }
+
+        .section h3 {
+            margin-bottom: 15px;
+            color: #ffffff;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: rgba(30, 30, 30, 0.9);
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #ffffff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+            background: rgba(40, 40, 40, 0.9);
+        }
+
+        button {
+            background: linear-gradient(45deg, #ffffff, #cccccc);
+            color: #000000;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, #cccccc, #999999);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+        }
+
+        .color-opacity {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .color-opacity input {
+            margin-bottom: 0;
+        }
+
+        /* Estilos específicos para sliders de opacidad */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        input[type="range"]::-webkit-slider-track {
+            background: linear-gradient(to right, #ffffff 0%, #ffffff 100%, #333 100%, #333 100%);
+            border-radius: 4px;
+        }
+
+        input[type="range"]::-moz-range-track {
+            background: linear-gradient(to right, #ffffff 0%, #ffffff 100%, #333 100%, #333 100%);
+            border-radius: 4px;
+        }
+
+        .element-list {
+            max-height: 250px;
+            overflow-y: auto;
+            background: rgba(15, 15, 15, 0.9);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #333;
+        }
+
+        .element-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(40, 40, 40, 0.8);
+            border-radius: 8px;
+            font-size: 13px;
+            border: 1px solid #444;
+            transition: all 0.3s ease;
+        }
+
+        .element-item:hover {
+            background: rgba(50, 50, 50, 0.9);
+            border-color: #ffffff;
+        }
+
+        .element-item button {
+            width: auto;
+            padding: 6px 12px;
+            margin: 0;
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            font-size: 11px;
+        }
+
+        .json-output {
+            background: rgba(10, 10, 10, 0.95);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            color: #ffffff;
+        }
+
+        .copy-btn {
+            background: linear-gradient(45deg, #ffffff, #cccccc);
+            margin-top: 15px;
+            color: #000000;
+        }
+
+        .copy-btn:hover {
+            background: linear-gradient(45deg, #cccccc, #999999);
+        }
+
+        .instructions {
+            background: rgba(20, 20, 20, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            line-height: 1.6;
+            border: 1px solid #333;
+        }
+
+        .instructions h3 {
+            color: #ffffff;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+            color: #ccc;
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: 1px solid #ffffff;
+            font-size: 12px;
+            color: #ffffff;
+            z-index: 1000;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(20, 20, 20, 0.8);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, #ffffff, #cccccc);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(45deg, #cccccc, #999999);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="workspace">
+            <div class="canvas-container">
+                <img id="background-canvas" src="" alt="Background" style="display: none;">
+                <div id="elements-container"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="instructions">
+                <h3>🎮 Instrucciones</h3>
+                <ul>
+                    <li>📁 Sube la imagen de fondo (1280x720px)</li>
+                    <li>➕ Añade elementos de texto arrastrándolos</li>
+                    <li>🎯 Selecciona elementos para editarlos</li>
+                    <li>🗑️ Usa Delete para eliminar elementos</li>
+                    <li>📋 Genera el JSON y cópialo al portapapeles</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>🖼️ Imagen de Fondo</h3>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ffffff; font-size: 12px;">Imagen de Día:</label>
+                    <input type="file" id="background-input-day" accept="image/*">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ffffff; font-size: 12px;">Imagen de Noche:</label>
+                    <input type="file" id="background-input-night" accept="image/*">
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ffffff; font-size: 12px;">Modo de Visualización:</label>
+                    <select id="background-mode" style="margin-bottom: 0;">
+                        <option value="day">Día</option>
+                        <option value="night">Noche</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📝 Añadir Elemento</h3>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ffffff; font-size: 12px;">Modo de Edición:</label>
+                    <select id="edit-mode" style="margin-bottom: 0;">
+                        <option value="day">Día</option>
+                        <option value="night">Noche</option>
+                    </select>
+                </div>
+                <input type="text" id="element-id" placeholder="ID del elemento">
+                <input type="text" id="element-text" placeholder="Texto">
+                <input type="number" id="element-font-size" placeholder="Tamaño de fuente" value="36">
+                <div class="color-opacity">
+                    <input type="color" id="element-color" value="#ffffff">
+                    <input type="range" id="element-opacity" min="0" max="100" value="100">
+                </div>
+                <div style="font-size: 12px; margin-bottom: 10px; color: #ffffff;">
+                    Opacidad: <span id="opacity-value">100</span>%
+                </div>
+                <div style="font-size: 12px; margin-bottom: 10px; color: #ffffff;">
+                    Color: <span id="color-value">#ffffff</span> <button onclick="copyColor()" style="width: auto; padding: 4px 8px; margin-left: 10px; font-size: 10px;">📋</button>
+                </div>
+                <button onclick="addElement()">➕ Añadir Elemento</button>
+            </div>
+
+            <div class="section">
+                <h3>📋 Elementos</h3>
+                <div class="element-list" id="elements-list"></div>
+            </div>
+
+            <div class="section" id="edit-section" style="display: none;">
+                <h3>✏️ Editar Elemento Seleccionado</h3>
+                <input type="text" id="edit-element-id" placeholder="ID del elemento">
+                <input type="text" id="edit-element-text" placeholder="Texto">
+                <input type="number" id="edit-element-font-size" placeholder="Tamaño de fuente">
+                <div class="color-opacity">
+                    <input type="color" id="edit-element-color" value="#ffffff">
+                    <input type="range" id="edit-element-opacity" min="0" max="100" value="100">
+                </div>
+                <div style="font-size: 12px; margin-bottom: 10px; color: #ffffff;">
+                    Opacidad: <span id="edit-opacity-value">100</span>%
+                </div>
+                <button onclick="updateSelectedElement()">💾 Actualizar Elemento</button>
+            </div>
+
+            <div class="section">
+                <h3>🎯 JSON Generado</h3>
+                <div id="scale-info" style="font-size: 12px; margin-bottom: 10px; color: #ffffff;">
+                    Coordenadas convertidas a 1280x720
+                </div>
+                <div class="json-output" id="json-output">// Sube una imagen y añade elementos para generar el JSON</div>
+                <button class="copy-btn" onclick="copyToClipboard()">📋 Copiar JSON</button>
+            </div>
+
+            <div class="section">
+                <h3>🌍 Configuración de Timezone</h3>
+                <select id="timezone-select" style="margin-bottom: 15px;">
+                    <option value="">Selecciona un timezone...</option>
+                </select>
+                <div style="font-size: 12px; color: #ffffff; margin-bottom: 10px;">
+                    Timezone seleccionado: <span id="selected-timezone">Ninguno</span>
+                </div>
+                <div id="timezone-info" style="display: none; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <h4 style="color: #ffffff; margin-bottom: 10px;">📅 Información del Timezone</h4>
+                    <div style="font-size: 12px; color: #ffffff; line-height: 1.4;">
+                        <div><strong>Ciudad:</strong> <span id="city-name">-</span></div>
+                        <div><strong>País:</strong> <span id="country-name">-</span></div>
+                        <div><strong>Hora actual:</strong> <span id="current-time">-</span></div>
+                    </div>
+                    <button onclick="addTimezoneElements()" style="margin-top: 10px; background: linear-gradient(45deg, #ffffff, #cccccc); color: #000000; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        ➕ Añadir Elementos del Timezone
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+        Ready to generate positions...
+    </div>
+
+    <script>
+        let elementsDay = [];
+        let elementsNight = [];
+        let selectedElement = null;
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        let currentMode = 'day'; // 'day' o 'night'
+
+        // Función simplificada para calcular coordenadas
+        function calculateCoordinates(element, imgRect) {
+            // Obtener las dimensiones reales de la imagen
+            const backgroundCanvas = document.getElementById('background-canvas');
+            const img = backgroundCanvas;
+            
+            // Si la imagen está cargada, usar sus dimensiones naturales
+            let imgWidth, imgHeight;
+            if (img.complete && img.naturalWidth > 0) {
+                imgWidth = img.naturalWidth;
+                imgHeight = img.naturalHeight;
+            } else {
+                // Fallback a las dimensiones del contenedor
+                imgWidth = imgRect.width;
+                imgHeight = imgRect.height;
+            }
+            
+            // Convertir directamente de coordenadas HTML a coordenadas 1280x720
+            const targetX = Math.round((element.position.x / imgRect.width) * 1280);
+            const targetY = Math.round((element.position.y / imgRect.height) * 720);
+            
+            // Escalar el tamaño de fuente proporcionalmente
+            const fontSize = Math.round(element.font_size * (1280 / imgRect.width));
+            
+            return { x: targetX, y: targetY, fontSize };
+        }
+
+        // Base de datos simple de timezones a países
+        const timezoneToCountry = {
+            'America/Lima': 'Perú',
+            'America/Santiago': 'Chile',
+            'America/Buenos_Aires': 'Argentina',
+            'America/Mexico_City': 'México',
+            'America/New_York': 'Estados Unidos',
+            'America/Los_Angeles': 'Estados Unidos',
+            'America/Chicago': 'Estados Unidos',
+            'America/Denver': 'Estados Unidos',
+            'America/Toronto': 'Canadá',
+            'America/Vancouver': 'Canadá',
+            'America/Sao_Paulo': 'Brasil',
+            'America/Bogota': 'Colombia',
+            'America/Caracas': 'Venezuela',
+            'America/Quito': 'Ecuador',
+            'America/La_Paz': 'Bolivia',
+            'America/Asuncion': 'Paraguay',
+            'America/Montevideo': 'Uruguay',
+            'Europe/London': 'Reino Unido',
+            'Europe/Paris': 'Francia',
+            'Europe/Berlin': 'Alemania',
+            'Europe/Madrid': 'España',
+            'Europe/Rome': 'Italia',
+            'Europe/Amsterdam': 'Países Bajos',
+            'Europe/Brussels': 'Bélgica',
+            'Europe/Vienna': 'Austria',
+            'Europe/Zurich': 'Suiza',
+            'Europe/Stockholm': 'Suecia',
+            'Europe/Oslo': 'Noruega',
+            'Europe/Copenhagen': 'Dinamarca',
+            'Europe/Helsinki': 'Finlandia',
+            'Europe/Warsaw': 'Polonia',
+            'Europe/Prague': 'República Checa',
+            'Europe/Budapest': 'Hungría',
+            'Europe/Bucharest': 'Rumania',
+            'Europe/Sofia': 'Bulgaria',
+            'Europe/Athens': 'Grecia',
+            'Europe/Istanbul': 'Turquía',
+            'Europe/Moscow': 'Rusia',
+            'Asia/Tokyo': 'Japón',
+            'Asia/Shanghai': 'China',
+            'Asia/Seoul': 'Corea del Sur',
+            'Asia/Singapore': 'Singapur',
+            'Asia/Bangkok': 'Tailandia',
+            'Asia/Manila': 'Filipinas',
+            'Asia/Jakarta': 'Indonesia',
+            'Asia/Kuala_Lumpur': 'Malasia',
+            'Asia/Ho_Chi_Minh': 'Vietnam',
+            'Asia/Hanoi': 'Vietnam',
+            'Asia/Dhaka': 'Bangladesh',
+            'Asia/Kolkata': 'India',
+            'Asia/Karachi': 'Pakistán',
+            'Asia/Dubai': 'Emiratos Árabes Unidos',
+            'Asia/Riyadh': 'Arabia Saudita',
+            'Asia/Tehran': 'Irán',
+            'Asia/Baghdad': 'Irak',
+            'Asia/Jerusalem': 'Israel',
+            'Asia/Amman': 'Jordania',
+            'Asia/Beirut': 'Líbano',
+            'Asia/Damascus': 'Siria',
+            'Asia/Yerevan': 'Armenia',
+            'Asia/Tbilisi': 'Georgia',
+            'Asia/Baku': 'Azerbaiyán',
+            'Asia/Tashkent': 'Uzbekistán',
+            'Asia/Almaty': 'Kazajistán',
+            'Asia/Astana': 'Kazajistán',
+            'Asia/Ulaanbaatar': 'Mongolia',
+            'Asia/Vladivostok': 'Rusia',
+            'Asia/Yekaterinburg': 'Rusia',
+            'Asia/Novosibirsk': 'Rusia',
+            'Asia/Krasnoyarsk': 'Rusia',
+            'Asia/Irkutsk': 'Rusia',
+            'Asia/Yakutsk': 'Rusia',
+            'Asia/Magadan': 'Rusia',
+            'Asia/Kamchatka': 'Rusia',
+            'Australia/Sydney': 'Australia',
+            'Australia/Melbourne': 'Australia',
+            'Australia/Brisbane': 'Australia',
+            'Australia/Perth': 'Australia',
+            'Australia/Adelaide': 'Australia',
+            'Australia/Darwin': 'Australia',
+            'Australia/Hobart': 'Australia',
+            'Pacific/Auckland': 'Nueva Zelanda',
+            'Pacific/Fiji': 'Fiyi',
+            'Pacific/Guam': 'Guam',
+            'Pacific/Honolulu': 'Estados Unidos',
+            'Pacific/Pago_Pago': 'Samoa Americana',
+            'Pacific/Tahiti': 'Polinesia Francesa',
+            'Pacific/Noumea': 'Nueva Caledonia',
+            'Pacific/Port_Moresby': 'Papúa Nueva Guinea',
+            'Pacific/Solomon_Islands': 'Islas Salomón',
+            'Pacific/Vanuatu': 'Vanuatu',
+            'Pacific/New_Caledonia': 'Nueva Caledonia',
+            'Pacific/French_Polynesia': 'Polinesia Francesa',
+            'Africa/Cairo': 'Egipto',
+            'Africa/Johannesburg': 'Sudáfrica',
+            'Africa/Lagos': 'Nigeria',
+            'Africa/Casablanca': 'Marruecos',
+            'Africa/Algiers': 'Argelia',
+            'Africa/Tunis': 'Túnez',
+            'Africa/Tripoli': 'Libia',
+            'Africa/Khartoum': 'Sudán',
+            'Africa/Addis_Ababa': 'Etiopía',
+            'Africa/Nairobi': 'Kenia',
+            'Africa/Dar_es_Salaam': 'Tanzania',
+            'Africa/Kampala': 'Uganda',
+            'Africa/Kigali': 'Ruanda',
+            'Africa/Bujumbura': 'Burundi',
+            'Africa/Luanda': 'Angola',
+            'Africa/Luanda': 'Angola',
+            'Africa/Kinshasa': 'República Democrática del Congo',
+            'Africa/Brazzaville': 'República del Congo',
+            'Africa/Libreville': 'Gabón',
+            'Africa/Douala': 'Camerún',
+            'Africa/Bangui': 'República Centroafricana',
+            'Africa/Ndjamena': 'Chad',
+            'Africa/Niamey': 'Níger',
+            'Africa/Ouagadougou': 'Burkina Faso',
+            'Africa/Bamako': 'Mali',
+            'Africa/Conakry': 'Guinea',
+            'Africa/Dakar': 'Senegal',
+            'Africa/Banjul': 'Gambia',
+            'Africa/Bissau': 'Guinea-Bissau',
+            'Africa/Freetown': 'Sierra Leona',
+            'Africa/Monrovia': 'Liberia',
+            'Africa/Accra': 'Ghana',
+            'Africa/Lome': 'Togo',
+            'Africa/Porto-Novo': 'Benín',
+            'Africa/Yaounde': 'Camerún',
+            'Africa/Malabo': 'Guinea Ecuatorial',
+            'Africa/Sao_Tome': 'Santo Tomé y Príncipe',
+            'Africa/Praia': 'Cabo Verde',
+            'Africa/El_Aaiun': 'Sahara Occidental',
+            'Africa/Asmara': 'Eritrea',
+            'Africa/Asmera': 'Eritrea',
+            'Africa/Djibouti': 'Yibuti',
+            'Africa/Mogadishu': 'Somalia',
+            'Africa/Maputo': 'Mozambique',
+            'Africa/Harare': 'Zimbabue',
+            'Africa/Lusaka': 'Zambia',
+            'Africa/Gaborone': 'Botsuana',
+            'Africa/Windhoek': 'Namibia',
+            'Africa/Maseru': 'Lesoto',
+            'Africa/Mbabane': 'Esuatini',
+            'Africa/Mauritius': 'Mauricio',
+            'Africa/Seychelles': 'Seychelles',
+            'Africa/Comoro': 'Comoras',
+            'Africa/Reunion': 'Reunión',
+            'Africa/Mayotte': 'Mayotte',
+            'Africa/Saint_Helena': 'Santa Elena',
+            'Africa/Ascension': 'Ascensión',
+            'Africa/Tristan_da_Cunha': 'Tristán de Acuña'
+        };
+
+        // Función para obtener el país real del timezone
+        function getCountryFromTimezone(timezone) {
+            return timezoneToCountry[timezone] || 'Desconocido';
+        }
+
+        // Cargar imagen de fondo
+        document.getElementById('background-input-day').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('background-canvas');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    updateStatus('Imagen de día cargada');
+                    updateJSON();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Cargar imagen de noche
+        document.getElementById('background-input-night').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                updateStatus('Imagen de noche cargada');
+                updateJSON();
+            }
+        });
+
+        // Cambiar modo de visualización
+        document.getElementById('background-mode').addEventListener('change', function(e) {
+            const mode = e.target.value;
+            const dayFile = document.getElementById('background-input-day').files[0];
+            const nightFile = document.getElementById('background-input-night').files[0];
+            
+            if (mode === 'day' && dayFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('background-canvas');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(dayFile);
+            } else if (mode === 'night' && nightFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('background-canvas');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(nightFile);
+            } else {
+                // Si no hay archivo para el modo seleccionado, mostrar mensaje
+                updateStatus(`⚠️ No hay imagen de ${mode} cargada`);
+                return;
+            }
+            
+            // Actualizar el modo de edición para que coincida con el modo de visualización
+            document.getElementById('edit-mode').value = mode;
+            currentMode = mode;
+            renderElements();
+            updateElementsList();
+            
+            updateStatus(`Modo ${mode} activado`);
+        });
+
+        // Cambiar modo de edición
+        document.getElementById('edit-mode').addEventListener('change', function(e) {
+            currentMode = e.target.value;
+            
+            // Cambiar también la imagen de fondo según el modo
+            const dayFile = document.getElementById('background-input-day').files[0];
+            const nightFile = document.getElementById('background-input-night').files[0];
+            
+            if (currentMode === 'day' && dayFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('background-canvas');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(dayFile);
+            } else if (currentMode === 'night' && nightFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('background-canvas');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(nightFile);
+            }
+            
+            // Actualizar el modo de visualización para que coincida
+            document.getElementById('background-mode').value = currentMode;
+            
+            renderElements();
+            updateElementsList();
+            updateStatus(`Modo de edición: ${currentMode}`);
+        });
+
+        // Actualizar valor de opacidad
+        document.getElementById('element-opacity').addEventListener('input', function(e) {
+            const value = e.target.value;
+            document.getElementById('opacity-value').textContent = value;
+            updateSliderBackground(e.target, value);
+        });
+
+        // Actualizar valor de opacidad en edición
+        document.getElementById('edit-element-opacity').addEventListener('input', function(e) {
+            const value = e.target.value;
+            document.getElementById('edit-opacity-value').textContent = value;
+            updateSliderBackground(e.target, value);
+        });
+
+        // Función para actualizar el fondo del slider
+        function updateSliderBackground(slider, value) {
+            const percentage = value;
+            slider.style.background = `linear-gradient(to right, #ffffff 0%, #ffffff ${percentage}%, #333 ${percentage}%, #333 100%)`;
+        }
+
+        // Actualizar valor de color
+        document.getElementById('element-color').addEventListener('input', function(e) {
+            document.getElementById('color-value').textContent = e.target.value;
+        });
+
+        // Cargar timezones
+        function loadTimezones() {
+            const timezoneSelect = document.getElementById('timezone-select');
+            const timezones = Intl.supportedValuesOf('timeZone');
+            
+            timezones.forEach(timezone => {
+                const option = document.createElement('option');
+                option.value = timezone;
+                option.textContent = timezone;
+                timezoneSelect.appendChild(option);
+            });
+        }
+
+        // Actualizar timezone seleccionado
+        document.getElementById('timezone-select').addEventListener('change', function(e) {
+            const selectedTimezone = e.target.value;
+            document.getElementById('selected-timezone').textContent = selectedTimezone || 'Ninguno';
+            
+            if (selectedTimezone) {
+                updateTimezoneInfo(selectedTimezone);
+                document.getElementById('timezone-info').style.display = 'block';
+            } else {
+                document.getElementById('timezone-info').style.display = 'none';
+            }
+            
+            updateJSON();
+        });
+
+        // Actualizar información del timezone
+        function updateTimezoneInfo(timezone) {
+            if (!timezone) {
+                document.getElementById('timezone-info').style.display = 'none';
+                return;
+            }
+
+            try {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', { 
+                    timeZone: timezone,
+                    hour12: true,
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                // Extraer ciudad del timezone
+                const timezoneParts = timezone.split('/');
+                const city = timezoneParts[timezoneParts.length - 1].replace(/_/g, ' ');
+                
+                // Obtener país real usando la base de datos
+                const country = getCountryFromTimezone(timezone);
+
+                document.getElementById('city-name').textContent = city;
+                document.getElementById('country-name').textContent = country;
+                document.getElementById('current-time').textContent = timeString;
+
+                document.getElementById('timezone-info').style.display = 'block';
+                updateStatus(`✅ Timezone actualizado: ${city}, ${country}`);
+            } catch (error) {
+                updateStatus('❌ Error al obtener información del timezone');
+                document.getElementById('timezone-info').style.display = 'none';
+            }
+        }
+
+        // Actualizar información del timezone en tiempo real
+        function startTimezoneUpdate() {
+            const timezone = document.getElementById('timezone-select').value;
+            if (timezone) {
+                updateTimezoneInfo(timezone);
+            }
+            
+            // Actualizar cada segundo
+            setTimeout(startTimezoneUpdate, 1000);
+        }
+
+        // Iniciar actualización automática cuando se carga la página
+        document.addEventListener('DOMContentLoaded', function() {
+            startTimezoneUpdate();
+        });
+
+        // Añadir elementos del timezone
+        function addTimezoneElements() {
+            const timezone = document.getElementById('timezone-select').value;
+            if (!timezone) {
+                updateStatus('❌ Selecciona un timezone primero');
+                return;
+            }
+
+            // Obtener dimensiones de la imagen para posicionar
+            const backgroundCanvas = document.getElementById('background-canvas');
+            const imgRect = backgroundCanvas.getBoundingClientRect();
+            
+            let centerX, centerY;
+            if (backgroundCanvas.style.display !== 'none' && imgRect.width > 0 && imgRect.height > 0) {
+                centerX = imgRect.width / 2;
+                centerY = imgRect.height / 2;
+            } else {
+                const container = document.getElementById('elements-container');
+                const containerRect = container.getBoundingClientRect();
+                centerX = containerRect.width / 2;
+                centerY = containerRect.height / 2;
+            }
+
+            // Extraer ciudad y país del timezone
+            const timezoneParts = timezone.split('/');
+            const city = timezoneParts[timezoneParts.length - 1].replace(/_/g, ' ');
+            const country = getCountryFromTimezone(timezone);
+
+            // Elemento de ciudad (nombre real)
+            const cityElement = {
+                id: 'city_name',
+                text: city,
+                font_size: 48,
+                font_color: '#FFFFFF',
+                font_color_opacity: 1.0,
+                position: { x: centerX - 100, y: centerY - 50 }
+            };
+
+            // Elemento de país (nombre real)
+            const countryElement = {
+                id: 'country_name',
+                text: country,
+                font_size: 36,
+                font_color: '#FFFFFF',
+                font_color_opacity: 1.0,
+                position: { x: centerX - 80, y: centerY }
+            };
+
+            // Elemento de hora (placeholder)
+            const timeElement = {
+                id: 'time',
+                text: '{time}',
+                font_size: 72,
+                font_color: '#FFFFFF',
+                font_color_opacity: 1.0,
+                position: { x: centerX - 150, y: centerY + 50 }
+            };
+
+            // Añadir elementos al modo actual
+            if (currentMode === 'day') {
+                elementsDay.push(cityElement);
+                elementsDay.push(countryElement);
+                elementsDay.push(timeElement);
+            } else {
+                elementsNight.push(cityElement);
+                elementsNight.push(countryElement);
+                elementsNight.push(timeElement);
+            }
+
+            renderElements();
+            updateJSON();
+            updateStatus(`✅ Elementos del timezone añadidos al modo ${currentMode}`);
+        }
+
+        // Añadir elemento
+        function addElement() {
+            const id = document.getElementById('element-id').value;
+            const text = document.getElementById('element-text').value;
+            const fontSize = parseInt(document.getElementById('element-font-size').value);
+            const color = document.getElementById('element-color').value;
+            const opacity = parseInt(document.getElementById('element-opacity').value) / 100;
+
+            if (!id || !text) {
+                updateStatus('❌ Completa el ID y texto del elemento');
+                return;
+            }
+
+            // Obtener dimensiones de la imagen para posicionar en el centro
+            const backgroundCanvas = document.getElementById('background-canvas');
+            const imgRect = backgroundCanvas.getBoundingClientRect();
+            
+            let centerX, centerY;
+            if (backgroundCanvas.style.display !== 'none' && imgRect.width > 0 && imgRect.height > 0) {
+                centerX = imgRect.width / 2;
+                centerY = imgRect.height / 2;
+            } else {
+                const container = document.getElementById('elements-container');
+                const containerRect = container.getBoundingClientRect();
+                centerX = containerRect.width / 2;
+                centerY = containerRect.height / 2;
+            }
+
+            const element = {
+                id: id,
+                text: text,
+                font_size: fontSize,
+                font_color: color,
+                font_color_opacity: opacity,
+                position: { x: centerX, y: centerY }
+            };
+
+            // Añadir al array correspondiente según el modo
+            if (currentMode === 'day') {
+                elementsDay.push(element);
+            } else {
+                elementsNight.push(element);
+            }
+
+            renderElements();
+            updateJSON();
+            clearForm();
+            updateStatus(`✅ Elemento añadido al modo ${currentMode}`);
+        }
+
+        // Renderizar elementos
+        function renderElements() {
+            const container = document.getElementById('elements-container');
+            container.innerHTML = '';
+
+            // Renderizar elementos según el modo actual
+            const elementsToRender = currentMode === 'day' ? elementsDay : elementsNight;
+
+            elementsToRender.forEach((element, index) => {
+                const div = document.createElement('div');
+                div.className = 'text-element';
+                div.textContent = element.text;
+                div.style.left = element.position.x + 'px';
+                div.style.top = element.position.y + 'px';
+                div.style.fontSize = element.font_size + 'px';
+                div.style.color = element.font_color;
+                div.style.opacity = element.font_color_opacity;
+                div.style.fontFamily = 'Helvetica Neue, Arial, sans-serif';
+                div.style.fontWeight = 'bold';
+                div.style.whiteSpace = 'pre';
+                div.dataset.index = index;
+                div.dataset.mode = currentMode;
+
+                div.addEventListener('mousedown', startDrag);
+                div.addEventListener('click', selectElement);
+
+                container.appendChild(div);
+            });
+
+            updateElementsList();
+        }
+
+        // Iniciar arrastre
+        function startDrag(e) {
+            e.preventDefault();
+            isDragging = true;
+            selectedElement = parseInt(e.target.dataset.index);
+            currentMode = e.target.dataset.mode;
+            
+            const backgroundCanvas = document.getElementById('background-canvas');
+            const imgRect = backgroundCanvas.getBoundingClientRect();
+            
+            const elementsToUse = currentMode === 'day' ? elementsDay : elementsNight;
+            dragOffset.x = e.clientX - imgRect.left - elementsToUse[selectedElement].position.x;
+            dragOffset.y = e.clientY - imgRect.top - elementsToUse[selectedElement].position.y;
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        // Arrastrar
+        function drag(e) {
+            if (!isDragging) return;
+
+            const backgroundCanvas = document.getElementById('background-canvas');
+            const imgRect = backgroundCanvas.getBoundingClientRect();
+            
+            const x = e.clientX - imgRect.left - dragOffset.x;
+            const y = e.clientY - imgRect.top - dragOffset.y;
+
+            // Límites simples
+            const maxX = imgRect.width - 50;
+            const maxY = imgRect.height - 30;
+            
+            const elementsToUse = currentMode === 'day' ? elementsDay : elementsNight;
+            elementsToUse[selectedElement].position.x = Math.max(0, Math.min(x, maxX));
+            elementsToUse[selectedElement].position.y = Math.max(0, Math.min(y, maxY));
+
+            renderElements();
+            updateJSON();
+        }
+
+        // Detener arrastre
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        // Seleccionar elemento
+        function selectElement(e) {
+            if (isDragging) return;
+
+            document.querySelectorAll('.text-element').forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            e.target.classList.add('selected');
+            selectedElement = parseInt(e.target.dataset.index);
+            loadElementToForm(selectedElement);
+            loadElementToEditForm(selectedElement);
+            updateStatus('🎯 Elemento seleccionado');
+        }
+
+        // Cargar elemento al formulario
+        function loadElementToForm(index) {
+            const elementsToUse = currentMode === 'day' ? elementsDay : elementsNight;
+            const element = elementsToUse[index];
+            document.getElementById('element-id').value = element.id;
+            document.getElementById('element-text').value = element.text;
+            document.getElementById('element-font-size').value = element.font_size;
+            document.getElementById('element-color').value = element.font_color;
+            document.getElementById('element-opacity').value = Math.round(element.font_color_opacity * 100);
+            document.getElementById('opacity-value').textContent = Math.round(element.font_color_opacity * 100);
+            document.getElementById('color-value').textContent = element.font_color;
+        }
+
+        // Cargar elemento al formulario de edición
+        function loadElementToEditForm(index) {
+            const elementsToUse = currentMode === 'day' ? elementsDay : elementsNight;
+            const element = elementsToUse[index];
+            document.getElementById('edit-element-id').value = element.id;
+            document.getElementById('edit-element-text').value = element.text;
+            document.getElementById('edit-element-font-size').value = element.font_size;
+            document.getElementById('edit-element-color').value = element.font_color;
+            document.getElementById('edit-element-opacity').value = Math.round(element.font_color_opacity * 100);
+            document.getElementById('edit-opacity-value').textContent = Math.round(element.font_color_opacity * 100);
+            
+            // Mostrar sección de edición
+            document.getElementById('edit-section').style.display = 'block';
+        }
+
+        // Actualizar elemento seleccionado
+        function updateSelectedElement() {
+            if (selectedElement === null) {
+                updateStatus('❌ No hay elemento seleccionado');
+                return;
+            }
+
+            const id = document.getElementById('edit-element-id').value;
+            const text = document.getElementById('edit-element-text').value;
+            const fontSize = parseInt(document.getElementById('edit-element-font-size').value);
+            const color = document.getElementById('edit-element-color').value;
+            const opacity = parseInt(document.getElementById('edit-element-opacity').value) / 100;
+
+            if (!id || !text) {
+                updateStatus('❌ Completa el ID y texto del elemento');
+                return;
+            }
+
+            // Actualizar el elemento en el array correspondiente
+            const elementsToUse = currentMode === 'day' ? elementsDay : elementsNight;
+            elementsToUse[selectedElement].id = id;
+            elementsToUse[selectedElement].text = text;
+            elementsToUse[selectedElement].font_size = fontSize;
+            elementsToUse[selectedElement].font_color = color;
+            elementsToUse[selectedElement].font_color_opacity = opacity;
+
+            renderElements();
+            updateJSON();
+            updateStatus(`✅ Elemento actualizado en modo ${currentMode}`);
+        }
+
+        // Actualizar lista de elementos
+        function updateElementsList() {
+            const list = document.getElementById('elements-list');
+            list.innerHTML = '';
+
+            const elementsToUse = currentMode === 'day' ? elementsDay : elementsNight;
+            elementsToUse.forEach((element, index) => {
+                const item = document.createElement('div');
+                item.className = 'element-item';
+                item.innerHTML = `
+                    <span>${element.id}: ${element.text}</span>
+                    <button onclick="deleteElementDay(${index})">🗑️</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // Actualizar JSON con cálculo simplificado
+        function updateJSON() {
+            const backgroundCanvas = document.getElementById('background-canvas');
+            const imgRect = backgroundCanvas.getBoundingClientRect();
+            
+            if (backgroundCanvas.style.display === 'none' || imgRect.width === 0) {
+                document.getElementById('json-output').textContent = '// Carga una imagen primero';
+                return;
+            }
+
+            // Obtener el nombre del archivo de imagen
+            const backgroundImg = backgroundCanvas;
+            let backgroundFileName = '';
+            if (backgroundImg.src && backgroundImg.src !== '') {
+                // Extraer el nombre del archivo de la URL
+                const urlParts = backgroundImg.src.split('/');
+                backgroundFileName = urlParts[urlParts.length - 1].split('?')[0];
+            }
+
+            // Obtener nombres de archivos de día y noche
+            const dayFile = document.getElementById('background-input-day').files[0];
+            const nightFile = document.getElementById('background-input-night').files[0];
+            
+            let dayFileName = '';
+            let nightFileName = '';
+            
+            if (dayFile) {
+                dayFileName = dayFile.name;
+            }
+            if (nightFile) {
+                nightFileName = nightFile.name;
+            }
+
+            const timezone = document.getElementById('timezone-select').value;
+            const elementsDayCoords = elementsDay.map(element => {
+                const coords = calculateCoordinates(element, imgRect);
+                
+                return {
+                    id: element.id,
+                    text: element.text,
+                    font_size: coords.fontSize,
+                    font_color: element.font_color,
+                    font_color_opacity: element.font_color_opacity,
+                    position: { x: coords.x, y: coords.y }
+                };
+            });
+
+            const elementsNightCoords = elementsNight.map(element => {
+                const coords = calculateCoordinates(element, imgRect);
+                
+                return {
+                    id: element.id,
+                    text: element.text,
+                    font_size: coords.fontSize,
+                    font_color: element.font_color,
+                    font_color_opacity: element.font_color_opacity,
+                    position: { x: coords.x, y: coords.y }
+                };
+            });
+
+            const json = {
+                "bumper_type": "city_time",
+                "bumper_duration_ms": 9000,
+                "black_screen_duration_ms": 1000,
+                "audio_start_ms": 0,
+                "audio_play_delay_ms": 1000,
+                "data_source": {
+                    "type": "city_time",
+                    "params": {
+                        "timezone": timezone || "America/Lima",
+                        "time_format": "%I:%M %p",
+                        "sunrise_hour": 6,
+                        "sunset_hour": 18
+                    }
+                },
+                "background": {
+                    "day_media_file": dayFileName,
+                    "night_media_file": nightFileName,
+                    "fallback_color": "#000000"
+                },
+                "defaults": { 
+                    "font_face": "Helvetica Neue Condensed Bold.ttf", 
+                    "font_color": "#FFFFFF" 
+                },
+                "elements_day": elementsDayCoords,
+                "elements_night": elementsNightCoords
+            };
+
+            document.getElementById('json-output').textContent = JSON.stringify(json, null, 2);
+            
+            // Mostrar información sobre las dimensiones
+            const img = backgroundCanvas;
+            let dimensionInfo = '';
+            if (img.complete && img.naturalWidth > 0) {
+                dimensionInfo = `Imagen: ${img.naturalWidth}x${img.naturalHeight}px → Convertido a 1280x720px`;
+            } else {
+                dimensionInfo = `Canvas: ${Math.round(imgRect.width)}x${Math.round(imgRect.height)}px → Convertido a 1280x720px`;
+            }
+            
+            const scaleInfo = document.getElementById('scale-info');
+            scaleInfo.textContent = `${dimensionInfo} (${elementsDay.length} elementos día, ${elementsNight.length} elementos noche)`;
+        }
+
+        // Eliminar elemento
+        function deleteElementDay(index) {
+            const elementsToUse = currentMode === 'day' ? elementsDay : elementsNight;
+            elementsToUse.splice(index, 1);
+            renderElements();
+            updateJSON();
+            updateStatus(`🗑️ Elemento eliminado del modo ${currentMode}`);
+        }
+
+        // Copiar al portapapeles
+        function copyToClipboard() {
+            const jsonText = document.getElementById('json-output').textContent;
+            navigator.clipboard.writeText(jsonText).then(() => {
+                updateStatus('📋 JSON copiado al portapapeles!');
+            }).catch(err => {
+                console.error('Error al copiar:', err);
+                const textArea = document.createElement('textarea');
+                textArea.value = jsonText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                updateStatus('📋 JSON copiado al portapapeles!');
+            });
+        }
+
+        // Limpiar formulario
+        function clearForm() {
+            document.getElementById('element-id').value = '';
+            document.getElementById('element-text').value = '';
+            document.getElementById('element-font-size').value = '36';
+            document.getElementById('element-color').value = '#ffffff';
+            document.getElementById('element-opacity').value = '100';
+            document.getElementById('opacity-value').textContent = '100';
+            document.getElementById('color-value').textContent = '#ffffff';
+        }
+
+        // Actualizar barra de estado
+        function updateStatus(message) {
+            const statusBar = document.getElementById('status-bar');
+            statusBar.textContent = message;
+            statusBar.style.color = message.includes('❌') ? '#ff4444' : '#ffffff';
+        }
+
+        // Eliminar elemento con Delete
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Delete' && selectedElement !== null) {
+                deleteElementDay(selectedElement);
+                selectedElement = null;
+            }
+        });
+
+        // Inicializar
+        updateJSON();
+        updateStatus('Ready to generate positions...');
+        loadTimezones(); // Cargar timezones al cargar la página
+
+        // Sincronizar sliders de opacidad
+        function syncOpacitySliders() {
+            // Establecer valor y actualizar display
+            const opacitySlider = document.getElementById('element-opacity');
+            const editOpacitySlider = document.getElementById('edit-element-opacity');
+            
+            if (opacitySlider) {
+                opacitySlider.value = '100';
+                document.getElementById('opacity-value').textContent = '100';
+                updateSliderBackground(opacitySlider, 100);
+            }
+            
+            if (editOpacitySlider) {
+                editOpacitySlider.value = '100';
+                document.getElementById('edit-opacity-value').textContent = '100';
+                updateSliderBackground(editOpacitySlider, 100);
+            }
+        }
+
+        // Sincronizar selectores de modo al cargar
+        function syncModeSelectors() {
+            const backgroundMode = document.getElementById('background-mode').value;
+            const editMode = document.getElementById('edit-mode');
+            
+            editMode.value = backgroundMode;
+            currentMode = backgroundMode;
+            
+            updateStatus(`Modo inicial: ${currentMode}`);
+        }
+
+        // Llamar sincronización al cargar
+        document.addEventListener('DOMContentLoaded', function() {
+            startTimezoneUpdate();
+            syncOpacitySliders();
+            syncModeSelectors();
+        });
+
+        // Sincronizar también después de un pequeño delay para asegurar que todo esté cargado
+        setTimeout(syncOpacitySliders, 100);
+
+        // Función para copiar el color
+        function copyColor() {
+            const colorValue = document.getElementById('color-value').textContent;
+            navigator.clipboard.writeText(colorValue).then(() => {
+                updateStatus('Color copiado al portapapeles!');
+            }).catch(err => {
+                console.error('Error al copiar color:', err);
+                const textArea = document.createElement('textarea');
+                textArea.value = colorValue;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                updateStatus('Color copiado al portapapeles!');
+            });
+        }
+    </script>
+</body>
+</html>
