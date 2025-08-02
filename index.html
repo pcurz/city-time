@@ -872,11 +872,41 @@
             }
         }
 
+        // Actualizar elementos de hora en tiempo real
+        function updateTimeElements() {
+            const timezone = document.getElementById('timezone-select').value;
+            if (!timezone) return;
+            
+            try {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', { 
+                    timeZone: timezone,
+                    hour12: true,
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                // Actualizar elementos que muestran {time}
+                document.querySelectorAll('.text-element').forEach(element => {
+                    const index = parseInt(element.dataset.index);
+                    const mode = element.dataset.mode;
+                    const elementsToUse = mode === 'day' ? elementsDay : elementsNight;
+                    
+                    if (elementsToUse[index] && elementsToUse[index].text === '{time}') {
+                        element.textContent = timeString;
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating time elements:', error);
+            }
+        }
+
         // Actualizar información del timezone en tiempo real
         function startTimezoneUpdate() {
             const timezone = document.getElementById('timezone-select').value;
             if (timezone) {
                 updateTimezoneInfo(timezone);
+                updateTimeElements(); // Actualizar elementos de hora
             }
             
             // Actualizar cada segundo
@@ -1023,7 +1053,30 @@
             elementsToRender.forEach((element, index) => {
                 const div = document.createElement('div');
                 div.className = 'text-element';
-                div.textContent = element.text;
+                
+                // Mostrar hora real si el texto es {time}
+                let displayText = element.text;
+                if (element.text === '{time}') {
+                    const timezone = document.getElementById('timezone-select').value;
+                    if (timezone) {
+                        try {
+                            const now = new Date();
+                            const timeString = now.toLocaleTimeString('en-US', { 
+                                timeZone: timezone,
+                                hour12: true,
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                            displayText = timeString;
+                        } catch (error) {
+                            displayText = '12:00 PM'; // Fallback
+                        }
+                    } else {
+                        displayText = '12:00 PM'; // Fallback si no hay timezone
+                    }
+                }
+                
+                div.textContent = displayText;
                 div.style.left = element.position.x + 'px';
                 div.style.top = element.position.y + 'px';
                 div.style.fontSize = element.font_size + 'px';
